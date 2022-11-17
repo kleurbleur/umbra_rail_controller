@@ -5,6 +5,7 @@
 #include <WiFiUdp.h>
 #include <AccelStepper.h>
 
+
 #define dirPin 4
 #define stepPin 5
 #define motorInterfaceType 1 // Motor interface type must be set to 1 when using a driver:
@@ -19,6 +20,8 @@ WiFiClient ethclient;
 WiFiUDP udp;
 MicroOscUdp<1024> oscUdp(&udp, sendIp, sendPort);
 
+// variables
+bool stepper_enable = false;
 
 // the ethernet function
 static bool eth_connected = false;
@@ -65,21 +68,51 @@ void WiFiEvent(WiFiEvent_t event)
 // FUNCTION THAT WILL BE CALLED WHEN AN OSC MESSAGE IS RECEIVED:
 void receivedOscMessage( MicroOscMessage& message) {
 
-  if ( message.fullMatch("/position/i", "i") ) {
-    int32_t firstArgument = message.nextAsInt();
+  if ( message.fullMatch("/enable/i", "i") ) {
+    int32_t val = message.nextAsInt();
 
-    oscUdp.sendMessage( "/position/i",  "i",  firstArgument);
-    Serial.print("DEBUG /position/i ");
-    Serial.println(firstArgument);
+    oscUdp.sendMessage( "/enable/i",  "i",  val);
+    Serial.print("DEBUG /enable/i ");
+    Serial.println(val);
 
     // Set the target position:
-    stepper.moveTo(firstArgument);
-    // Run to target position with set speed and acceleration/deceleration:
+    if (val){
+      stepper_enable = true;
+      Serial.println("Outputs enabled");
+      // stepper.enableOutputs();
+    }
+    else if (!val)
+    {
+      stepper_enable = false;
+      Serial.println("Outputs disabled");
+      // stepper.disableOutputs();
+    }
+  }
+
+  if ( message.fullMatch("/speed/i", "i") ) {
+    int32_t val = message.nextAsInt();
+
+    oscUdp.sendMessage( "/speed/i",  "i",  val);
+    Serial.print("DEBUG /speed/i ");
+    Serial.println(val);
+
+    stepper.setMaxSpeed(val);
+  }  
+
+  if ( message.fullMatch("/position/i", "i") ) {
+    int32_t val = message.nextAsInt();
+
+    oscUdp.sendMessage( "/position/i",  "i",  val);
+    Serial.print("DEBUG /position/i ");
+    Serial.println(val);
+
+    stepper.moveTo(val);
     Serial.println("Run to position");
     Serial.println(stepper.distanceToGo());
-    stepper.runToPosition();
-
   }
+
+
+
 
 
 
@@ -141,6 +174,7 @@ void setup()
 
   stepper.setMaxSpeed(15000);
   stepper.setAcceleration(1500);
+  stepper.disableOutputs();
 
 
 }
@@ -150,5 +184,13 @@ void loop()
 {
 
   oscUdp.receiveMessages( receivedOscMessage );
+  if (stepper_enable)
+  {
+    stepper.run();
+  }
+  if (stepper.isRunning())
+  {
+    Serial.println(stepper.distanceToGo());
+  }
 
 }
