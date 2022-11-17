@@ -3,25 +3,28 @@
 #include <ETH.h>
 #include <MicroOscUdp.h>
 #include <WiFiUdp.h>
-#include <AccelStepper.h>
 
-#define dirPin 4
-#define stepPin 5
-#define motorInterfaceType 1 // Motor interface type must be set to 1 when using a driver:
-
-unsigned int receivePort = 8888;
-unsigned int sendPort = 7777;
-IPAddress broadcastIp(255, 255, 255, 255);
-IPAddress sendIp(192, 168, 178, 213);
-
-AccelStepper stepper = AccelStepper(motorInterfaceType, stepPin, dirPin);
 WiFiClient ethclient;
 WiFiUDP udp;
+
+unsigned int receivePort = 8888;
+IPAddress broadcastIp(255, 255, 255, 255);
+IPAddress sendIp(192, 168, 178, 213);
+unsigned int sendPort = 7777;
+
+
+// The number 1024 between the < > below  is the maximum number of bytes reserved for incomming messages.
+// Outgoing messages are written directly to the output and do not need more reserved bytes.
 MicroOscUdp<1024> oscUdp(&udp, sendIp, sendPort);
 
 
-// the ethernet function
+
+
 static bool eth_connected = false;
+
+
+
+
 void WiFiEvent(WiFiEvent_t event)
 {
   switch (event)
@@ -64,24 +67,7 @@ void WiFiEvent(WiFiEvent_t event)
 
 // FUNCTION THAT WILL BE CALLED WHEN AN OSC MESSAGE IS RECEIVED:
 void receivedOscMessage( MicroOscMessage& message) {
-
-  if ( message.fullMatch("/position/i", "i") ) {
-    int32_t firstArgument = message.nextAsInt();
-
-    oscUdp.sendMessage( "/position/i",  "i",  firstArgument);
-    Serial.print("DEBUG /position/i ");
-    Serial.println(firstArgument);
-
-    // Set the target position:
-    stepper.moveTo(firstArgument);
-    // Run to target position with set speed and acceleration/deceleration:
-    Serial.println("Run to position");
-    Serial.println(stepper.distanceToGo());
-    stepper.runToPosition();
-
-  }
-
-
+  // WHEN A MESSAGE IS MATCHED IT ECHOS IT THROUGH SERIAL(ASCII) AND UDP
 
   if ( message.fullMatch("/test/i", "i") ) {
     int32_t firstArgument = message.nextAsInt();
@@ -139,9 +125,6 @@ void setup()
 
   udp.begin(receivePort);
 
-  stepper.setMaxSpeed(15000);
-  stepper.setAcceleration(1500);
-
 
 }
 
@@ -150,5 +133,6 @@ void loop()
 {
 
   oscUdp.receiveMessages( receivedOscMessage );
+
 
 }
