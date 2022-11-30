@@ -40,6 +40,7 @@ MicroOscUdp<1024> oscUdp(&udp, sendIp, sendPort);
 
 // GLOBAL VARIABLES 
 bool stepper_enable = false;
+bool stepper_calibrated = false;
 u_int32_t relative_position = 0;
 
 
@@ -87,6 +88,25 @@ void WiFiEvent(WiFiEvent_t event)
 
 // OSC CALLBACK
 void receivedOscMessage( MicroOscMessage& message) {
+
+  if ( message.fullMatch("/calibration/i", "i") ) {       // check for the full message match "/calibration/i" so for the calibration command
+    int32_t val = message.nextAsInt();                    // make val a local var with the value received from the matched OSC message
+    if (DEBUG == 1)
+    {
+      Serial.print("DEBUG /calibration/i ");
+      Serial.println(val);
+    }
+    if (val)                                              // if the received val is true (1)...
+    {                                            
+      stepperCalibration();                               // 1. start the calibration function
+    }
+    else if (!val)                                         // if the received val is false (0)...
+    {
+      Serial.printf("stepper_enable: ", stepper_enable);   // 2. inform via Serial
+      oscUdp.sendMessage( "/enable/i",  "i",  val);        // 3. send a validation back via OSC
+    }
+  }                                                        // end check for the enable command 
+
 
   if ( message.fullMatch("/enable/i", "i") ) {            // check for the full message match "/enable/i" so for the enable command
     int32_t val = message.nextAsInt();                    // make val a local var with the value received from the matched OSC message
@@ -181,6 +201,7 @@ bool sensorA()                                             // setup a true/false
 {
   if (digitalRead(ind_sensor_a))                           // if we have input from sensor a...
   {
+    stepper_enable = false;                                // 0. flag the stepper to stop
     stepper.stop();                                        // 1. then stop the stepper
     return true;                                           // 2. let the system know that the stepper is there
   }
@@ -193,6 +214,7 @@ bool sensorB()                                             // setup a true/false
 {
   if (digitalRead(ind_sensor_b))                           // if we have input from sensor a...
   {
+    stepper_enable = false;                                // 0. flag the stepper to stop
     stepper.stop();                                        // 1. then stop the stepper
     return true;                                           // 2. let the system know that the stepper is there
   }
@@ -202,18 +224,21 @@ bool sensorB()                                             // setup a true/false
   }
 }
 
-bool stepper_calibrated(){
+// THIS FUNCTION HAS TO BE TESTED - THE CALIBRATION FUNCTION
+bool stepperCalibration(){                                 // setup a true/false function to check if the stepper is calibrated or not
   Serial.println("calibrating steppper");
-  stepper.setMaxSpeed(1000);
-  stepper.setAcceleration(1000);
-  stepper.run();
+  stepper.setMaxSpeed(1000);                               // set the speed quite slow to not make any accidents
+  stepper.setAcceleration(1000);                           // same for acceleration
+  stepper_enable = true;                                   // set the flag so the stepper.run() code is executed continously in the main loop
 
-  if (sensorA || sensorB)
+  if (sensorA || sensorB)                                  // if either sensor is active...
   {
-    relative_position = stepper.currentPosition(); // te testen
-    return true;
+    relative_position = stepper.currentPosition();         // set the relative position with the current value so we know the home position
+    stepper_calibrated = true;                             // set the stepper calibrated flag so the sytem knows it's calibrated
+    oscUdp.sendMessage( "/calibration/i",  "i",  stepper_calibrated);  // 2. send a validation back via OSC
+    return true;                                           // return true when this function is checked 
   }
-  else if (!sensorA || !sensorB)
+  else if (!sensorA || !sensorB)                           // if neither of the sensors are active
   {
     return false;
   }
@@ -229,9 +254,14 @@ void setup()
 
   udp.begin(receivePort);
 
-  stepper.setMaxSpeed(15000);
-  stepper.setAcceleration(1500);
-  stepper.disableOutputs();
+  stepper.setMaxSpeed(0);                                   // make sure that the stepper doesn't go anywhere when only enabling
+  stepper.setAcceleration(0);                               // make sure that the stepper doesn't go anywhere when only enabling
+  // stepper.disableOutputs();                              // does not seem to do anything
+
+  if (!stepper_calibrated)                                  // if the stepper is NOT calibrated...  
+  {
+    stepperCalibration();                                   // run the calibration function
+  }
 
 
 }
@@ -240,28 +270,29 @@ void setup()
 void loop()
 {
 
-  sensorA();
-  sensorB();
+  sensorA();                                                 // continously check for sensor input
+  sensorB();                                                 // continously check for sensor input
 
-  if (!stepper_calibrated)
+
+  oscUdp.receiveMessages( receivedOscMessage );              // handle the incoming OSC messages
+
+  if (stepper_enable && stepper_calibrated)                  // if the stepper enable flag is set AND the stepper is calibrated...
   {
-    stepper_calibrated();
+    stepper.run();                                           // run the stepper
+  }
+  else if (stepper_enable && !stepper_calibrated)            // if the stepper enable flag is set but NOT the stepper calibration
+  {
+    Serial.println("calibrate the rails before usage");      // inform the user that is needs to calibrate first 
+    oscUdp.sendMessage("/calibration/i", "i", stepper_calibrated);  // send a message via OSC with the calibration on 0
   }
 
-  oscUdp.receiveMessages( receivedOscMessage );
 
-  if (stepper_enable && stepper_calibrated)
+  if (DEBUG == 2)
   {
-    stepper.run();
-  }
-  else if (stepper_enable && !stepper_calibrated)
-  {
-    Serial.println("calibrate the rails before usage");
-  }
-
-  if (stepper.isRunning())
-  {
-    Serial.println(stepper.distanceToGo());
+    if (stepper.isRunning())
+    {
+      Serial.println(stepper.distanceToGo());
+    }
   }
 
 
