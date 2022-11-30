@@ -1,11 +1,3 @@
-// CODE WRITTEN FOR UMBRA DURING INNOVATIONLAB UTRECHT BY MARK RIDDER, 2022
-//
-// HARDWARE USED 
-// CONTROLLER: OLIMEX EPS-POE-ISO
-// DRIVER: TB6600
-// STEPPER: JK57HS76-2804-76A - NEMA23
-// INDUCTIVE SENSORS: LJ18A3-8-Z/BX
-
 #include <Arduino.h>
 #include <PubSubClient.h>
 #include <ETH.h>
@@ -14,9 +6,29 @@
 #include <AccelStepper.h>
 
 
+// CODE WRITTEN FOR UMBRA DURING INNOVATIONLAB UTRECHT BY MARK RIDDER, 2022
+//
+// HARDWARE USED 
+// CONTROLLER: OLIMEX EPS-POE-ISO
+// DRIVER: TB6600
+// STEPPER: JK57HS76-2804-76A - NEMA23
+// INDUCTIVE SENSORS: LJ18A3-8-Z/BX
+
+
+
+
 
 // CONTROLLER NAME
 const char controller[] = "rail1";
+
+// NETWORK SETTINGS
+IPAddress sendIp(192, 168, 178, 213);         // the ip address of the receiving party
+unsigned int receivePort = 8888;              // the port in which the OSC messsage come in
+unsigned int sendPort = 7777;                 // and the port towards the OSC messages are send
+IPAddress broadcastIp(255, 255, 255, 255);    // did not test it yet, but looks like a broadcast option
+
+
+
 
 
 // PIN ASSIGNMENT
@@ -24,13 +36,6 @@ const char controller[] = "rail1";
 #define stepPin 5               // Step pin output for the Stepper Driver
 u_int8_t ind_sensor_a = 32;     // Input pin from sensor a - WARNING! -> only to be connected via an optocoupler!
 u_int8_t ind_sensor_b = 33;     // Input pin from sensor b - WARNING! -> only to be connected via an optocoupler!
-
-
-// NETWORK SETTINGS
-IPAddress sendIp(192, 168, 178, 213);         // the ip address of the receiving party
-unsigned int receivePort = 8888;              // the port in which the OSC messsage come in
-unsigned int sendPort = 7777;                 // and the port towards the OSC messages are send
-IPAddress broadcastIp(255, 255, 255, 255);    // did not test it yet, but looks like a broadcast option
 
 
 // DEBUG SETTINGS
@@ -233,7 +238,18 @@ void receivedOscMessage( MicroOscMessage& message)
     oscUdp.sendMessage(speed, "i", val);                   // send a validation back via OSC
   }  
 
-  if ( message.fullMatch(position, "i") ) {                // check for the full message match "/position/i" so for the position command
+  if ( message.fullMatch(acceleration, "i") ) {            // check for the full message match "/speed/i" so for the speed command
+    int32_t val = message.nextAsInt();                     // make val a local var with the value received from the matched OSC message
+    if (DEBUG == 1)
+    {
+    Serial.print("DEBUG /acceleration/i ");
+    Serial.println(val);
+    }
+    stepper.setAcceleration(val);                           // set the stepper speed with the received val
+    oscUdp.sendMessage(acceleration, "i", val);             // send a validation back via OSC
+  }  
+
+  if ( message.fullMatch(position, "i") ) {                 // check for the full message match "/position/i" so for the position command
     int32_t val = message.nextAsInt();                     // make val a local var with the value received from the matched OSC message
     if (DEBUG == 1)
     {
