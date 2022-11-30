@@ -9,6 +9,10 @@
 #define dirPin 4
 #define stepPin 5
 #define motorInterfaceType 1 // Motor interface type must be set to 1 when using a driver:
+u_int8_t ind_sensor_a = 32;
+u_int8_t ind_sensor_b = 33;
+
+
 
 unsigned int receivePort = 8888;
 unsigned int sendPort = 7777;
@@ -22,6 +26,7 @@ MicroOscUdp<1024> oscUdp(&udp, sendIp, sendPort);
 
 // variables
 bool stepper_enable = false;
+u_int32_t relative_position = 10000;
 
 // the ethernet function
 static bool eth_connected = false;
@@ -110,12 +115,6 @@ void receivedOscMessage( MicroOscMessage& message) {
     Serial.println("Run to position");
     Serial.println(stepper.distanceToGo());
   }
-
-
-
-
-
-
   if ( message.fullMatch("/test/i", "i") ) {
     int32_t firstArgument = message.nextAsInt();
 
@@ -160,6 +159,48 @@ void receivedOscMessage( MicroOscMessage& message) {
     }
 
   }
+}
+
+bool sensorA()
+{
+  if (digitalRead(ind_sensor_a))
+  {
+    stepper.stop();
+    return true;
+  }
+  else if (!digitalRead(ind_sensor_a))
+  {
+    return false;
+  }
+}
+bool sensorB()
+{
+  if (digitalRead(ind_sensor_b))
+  {
+    stepper.stop();
+    return true;
+  }
+  else if (!digitalRead(ind_sensor_b))
+  {
+    return false;
+  }
+}
+
+bool stepper_calibrated(){
+  Serial.println("calibrating steppper");
+  stepper.setMaxSpeed(1000);
+  stepper.setAcceleration(1000);
+  stepper.run();
+
+  if(sensorA || sensorB)
+  {
+    relative_position = stepper.currentPosition(); // te testen
+    return true;
+  }
+  else if (!sensorA || !sensorB)
+  {
+    return false;
+  }
 
 }
 
@@ -183,14 +224,30 @@ void setup()
 void loop()
 {
 
+  sensorA();
+  sensorB();
+
+  if (!stepper_calibrated)
+  {
+    stepper_calibrated();
+  }
+
   oscUdp.receiveMessages( receivedOscMessage );
-  if (stepper_enable)
+
+  if (stepper_enable && stepper_calibrated)
   {
     stepper.run();
   }
+  else if (stepper_enable && !stepper_calibrated)
+  {
+    Serial.println("calibrate the rails before usage");
+  }
+
   if (stepper.isRunning())
   {
     Serial.println(stepper.distanceToGo());
   }
+
+
 
 }
