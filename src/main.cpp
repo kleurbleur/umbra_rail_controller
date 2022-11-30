@@ -14,8 +14,10 @@
 #include <AccelStepper.h>
 
 
-// DEBUG SETTINGS 1 = OSC INPUT
-u_int8_t DEBUG = 1;
+
+// CONTROLLER NAME
+const char controller[] = "rail1";
+
 
 // PIN ASSIGNMENT
 #define dirPin 4                // Direction pin output for the Stepper Driver
@@ -30,6 +32,9 @@ unsigned int receivePort = 8888;              // the port in which the OSC messs
 unsigned int sendPort = 7777;                 // and the port towards the OSC messages are send
 IPAddress broadcastIp(255, 255, 255, 255);    // did not test it yet, but looks like a broadcast option
 
+
+// DEBUG SETTINGS
+u_int8_t DEBUG = 1;             // 1 = OSC messages 2 = distance to go
 
 
 // ================================================================================================
@@ -50,6 +55,11 @@ MicroOscUdp<1024> oscUdp(&udp, sendIp, sendPort);
 bool stepper_enable = false;
 bool stepper_calibrated = false;
 bool receive_OSC = false;
+char calibration[64] = "";
+char enable[64] = "";
+char speed[64] = "";
+char acceleration[64] = "";
+char position[64] = "";
 u_int32_t relative_position = 0;
 
 
@@ -94,115 +104,6 @@ void WiFiEvent(WiFiEvent_t event)
   }
 }
 
-
-// OSC CALLBACK
-void receivedOscMessage( MicroOscMessage& message) {
-
-  if ( message.fullMatch("/calibration/i", "i") ) {       // check for the full message match "/calibration/i" so for the calibration command
-    int32_t val = message.nextAsInt();                    // make val a local var with the value received from the matched OSC message
-    if (DEBUG == 1)
-    {
-      Serial.print("DEBUG /calibration/i ");
-      Serial.println(val);
-    }
-    if (val)                                              // if the received val is true (1)...
-    {                                            
-      stepperCalibration();                               // 1. start the calibration function
-    }
-    else if (!val)                                         // if the received val is false (0)...
-    {
-      Serial.printf("stepper_enable: ", stepper_enable);   // 2. inform via Serial
-      oscUdp.sendMessage( "/enable/i",  "i",  val);        // 3. send a validation back via OSC
-    }
-  }                                                        // end check for the enable command 
-
-  if ( message.fullMatch("/enable/i", "i") ) {            // check for the full message match "/enable/i" so for the enable command
-    int32_t val = message.nextAsInt();                    // make val a local var with the value received from the matched OSC message
-    if (DEBUG == 1)
-    {
-      Serial.print("DEBUG /enable/i ");
-      Serial.println(val);
-    }
-    if (val)                                              // if the received val is true (1)...
-    {                                            
-      stepper_enable = true;                              // 1. enable the stepper in the main loop via this flag
-      Serial.printf("stepper_enable: ", stepper_enable);  // 2. inform via Serial 
-      oscUdp.sendMessage( "/enable/i",  "i",  val);       // 3. send a validation back via OSC
-      // stepper.enableOutputs(); // this does not seem to work
-    }
-    else if (!val)                                         // if the received val is false (0)...
-    {
-      stepper_enable = false;                              // 1. enable the stepper in the main loop via this flag
-      Serial.printf("stepper_enable: ", stepper_enable);   // 2. inform via Serial
-      oscUdp.sendMessage( "/enable/i",  "i",  val);        // 3. send a validation back via OSC
-      // stepper.disableOutputs();  // this does not seem to work
-    }
-  }                                                        // end check for the enable command 
-
-  if ( message.fullMatch("/speed/i", "i") ) {              // check for the full message match "/speed/i" so for the speed command
-    int32_t val = message.nextAsInt();                     // make val a local var with the value received from the matched OSC message
-    if (DEBUG == 1)
-    {
-    Serial.print("DEBUG /speed/i ");
-    Serial.println(val);
-    }
-    stepper.setMaxSpeed(val);                              // set the stepper speed with the received val
-    oscUdp.sendMessage( "/speed/i",  "i",  val);           // send a validation back via OSC
-  }  
-
-  if ( message.fullMatch("/position/i", "i") ) {           // check for the full message match "/position/i" so for the position command
-    int32_t val = message.nextAsInt();                     // make val a local var with the value received from the matched OSC message
-    if (DEBUG == 1)
-    {
-    Serial.print("DEBUG /position/i ");
-    Serial.println(val);
-    }
-    stepper.moveTo(val+relative_position);                 // make sure to use the calibrated distance from the sensor with incoming position 
-    Serial.print("Target position: ");                     // inform via Serial
-    Serial.println(stepper.distanceToGo());
-    oscUdp.sendMessage( "/position/i",  "i",  val);        // send a validation back via OSC (only val, because the calibrated distance will alter per setup)
-  }
-  // // example code for later use
-  // if ( message.fullMatch("/test/i", "i") ) {
-  //   int32_t firstArgument = message.nextAsInt();
-  //   oscUdp.sendMessage( "/test/i",  "i",  firstArgument);
-  //   Serial.print("DEBUG /test/i ");
-  //   Serial.println(firstArgument);
-  // } else if ( message.fullMatch("/test/f",  "f")) {
-  //   float firstArgument = message.nextAsFloat();
-  //   oscUdp.sendMessage( "/test/f",  "f",  firstArgument);
-  //   Serial.print("DEBUG /test/f ");
-  //   Serial.println(firstArgument);
-  // } else if ( message.fullMatch("/test/b",  "b")) {
-  //   const uint8_t* blob;
-  //   uint32_t length = message.nextAsBlob(&blob);
-  //   if ( length != 0) {
-  //     oscUdp.sendMessage( "/test/b", "b", blob, length);
-  //     Serial.print("DEBUG /test/b ");
-  //     for ( int i = 0; i < length; i++ ) {
-  //       Serial.print(blob[i]);
-  //     }
-  //     Serial.println();
-  //   }
-  // } else if ( message.fullMatch("/test/s",  "s")) {
-  //   const char * s = message.nextAsString();
-  //   oscUdp.sendMessage( "/test/s",  "s",  s);
-  //   Serial.print("DEBUG /test/s ");
-  //   Serial.println(s);
-  // } else if ( message.fullMatch("/test/m", "m")) {
-  //   const uint8_t* midi;
-  //   message.nextAsMidi(&midi);
-  //   if ( midi != NULL ) {
-  //     oscUdp.sendMessage( "/test/m",  "m", midi);
-  //     Serial.print("DEBUG /test/m ");
-  //     for ( int i = 0; i < 4; i++ ) {
-  //       Serial.print(midi[i]);
-  //     }
-  //     Serial.println();
-  //   }
-  // }
-
-}
 
 // SENSOR FUNCTIONS
 bool sensorA()                                             // setup a true/false function to check if the sensors have input or not
@@ -255,9 +156,145 @@ bool stepperCalibration(){                                 // setup a true/false
 
 }
 
+// Prepare the OSC messages according to the controller name
+void oscMessage()
+{
+  char cal_mes[] = "/calibration/i";
+  strcpy(calibration,controller);
+  strcat(calibration,cal_mes);
+
+  char en_mes[] = "/enable/i";
+  strcpy(enable,controller);
+  strcat(enable,en_mes);
+
+  char sp_mes[] = "/speed/i";
+  strcpy(speed,controller);
+  strcat(speed,sp_mes);
+
+  char pos_mes[] = "/position/i";
+  strcpy(position,controller);
+  strcat(position,pos_mes);
+
+}
+
+// OSC CALLBACK
+void receivedOscMessage( MicroOscMessage& message) 
+{
+
+  if ( message.fullMatch(calibration, "i") ) {             // check for the calibration command which has an integer value
+    int32_t val = message.nextAsInt();                    // make val a local var with the value received from the matched OSC message
+    if (DEBUG == 1)
+    {
+      Serial.print("DEBUG /calibration/i ");
+      Serial.println(val);
+    }
+    if (val)                                              // if the received val is true (1)...
+    {                                            
+      stepperCalibration();                               // 1. start the calibration function
+    }
+    else if (!val)                                         // if the received val is false (0)...
+    {
+      Serial.printf("stepper_enable: ", stepper_enable);   // 2. inform via Serial
+      oscUdp.sendMessage(enable, "i", val);        // 3. send a validation back via OSC
+    }
+  }                                                        // end check for the enable command 
+
+  if ( message.fullMatch(enable, "i") ) {                  // check for the full message match "/enable/i" so for the enable command
+    int32_t val = message.nextAsInt();                    // make val a local var with the value received from the matched OSC message
+    if (DEBUG == 1)
+    {
+      Serial.print("DEBUG /enable/i ");
+      Serial.println(val);
+    }
+    if (val)                                              // if the received val is true (1)...
+    {                                            
+      stepper_enable = true;                              // 1. enable the stepper in the main loop via this flag
+      Serial.printf("stepper_enable: ", stepper_enable);  // 2. inform via Serial 
+      oscUdp.sendMessage(enable,  "i",  val);             // 3. send a validation back via OSC
+      // stepper.enableOutputs(); // this does not seem to work
+    }
+    else if (!val)                                         // if the received val is false (0)...
+    {
+      stepper_enable = false;                              // 1. enable the stepper in the main loop via this flag
+      Serial.printf("stepper_enable: ", stepper_enable);   // 2. inform via Serial
+      oscUdp.sendMessage(enable, "i", val);                // 3. send a validation back via OSC
+      // stepper.disableOutputs();  // this does not seem to work
+    }
+  }                                                        // end check for the enable command 
+
+  if ( message.fullMatch(speed, "i") ) {                   // check for the full message match "/speed/i" so for the speed command
+    int32_t val = message.nextAsInt();                     // make val a local var with the value received from the matched OSC message
+    if (DEBUG == 1)
+    {
+    Serial.print("DEBUG /speed/i ");
+    Serial.println(val);
+    }
+    stepper.setMaxSpeed(val);                              // set the stepper speed with the received val
+    oscUdp.sendMessage(speed, "i", val);                   // send a validation back via OSC
+  }  
+
+  if ( message.fullMatch(position, "i") ) {                // check for the full message match "/position/i" so for the position command
+    int32_t val = message.nextAsInt();                     // make val a local var with the value received from the matched OSC message
+    if (DEBUG == 1)
+    {
+    Serial.print("DEBUG /position/i ");
+    Serial.println(val);
+    }
+    stepper.moveTo(val+relative_position);                 // make sure to use the calibrated distance from the sensor with incoming position 
+    Serial.print("Target position: ");                     // inform via Serial
+    Serial.println(stepper.distanceToGo());
+    oscUdp.sendMessage(position, "i", val);                // send a validation back via OSC (only val, because the calibrated distance will alter per setup)
+  }
+  // // example code for later use
+  // if ( message.fullMatch("/test/i", "i") ) {
+  //   int32_t firstArgument = message.nextAsInt();
+  //   oscUdp.sendMessage( "/test/i",  "i",  firstArgument);
+  //   Serial.print("DEBUG /test/i ");
+  //   Serial.println(firstArgument);
+  // } else if ( message.fullMatch("/test/f",  "f")) {
+  //   float firstArgument = message.nextAsFloat();
+  //   oscUdp.sendMessage( "/test/f",  "f",  firstArgument);
+  //   Serial.print("DEBUG /test/f ");
+  //   Serial.println(firstArgument);
+  // } else if ( message.fullMatch("/test/b",  "b")) {
+  //   const uint8_t* blob;
+  //   uint32_t length = message.nextAsBlob(&blob);
+  //   if ( length != 0) {
+  //     oscUdp.sendMessage( "/test/b", "b", blob, length);
+  //     Serial.print("DEBUG /test/b ");
+  //     for ( int i = 0; i < length; i++ ) {
+  //       Serial.print(blob[i]);
+  //     }
+  //     Serial.println();
+  //   }
+  // } else if ( message.fullMatch("/test/s",  "s")) {
+  //   const char * s = message.nextAsString();
+  //   oscUdp.sendMessage( "/test/s",  "s",  s);
+  //   Serial.print("DEBUG /test/s ");
+  //   Serial.println(s);
+  // } else if ( message.fullMatch("/test/m", "m")) {
+  //   const uint8_t* midi;
+  //   message.nextAsMidi(&midi);
+  //   if ( midi != NULL ) {
+  //     oscUdp.sendMessage( "/test/m",  "m", midi);
+  //     Serial.print("DEBUG /test/m ");
+  //     for ( int i = 0; i < 4; i++ ) {
+  //       Serial.print(midi[i]);
+  //     }
+  //     Serial.println();
+  //   }
+  // }
+
+}
+
+
 
 void setup()
 {
+
+  // setup the osc naming
+  oscMessage();
+
   Serial.begin(115200);
   WiFi.onEvent(WiFiEvent);
   ETH.begin();
