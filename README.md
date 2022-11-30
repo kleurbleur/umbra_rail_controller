@@ -1,4 +1,4 @@
-The controller software for the UMBRA a/v performance done by Nikos ten Hoedt, Mark Ridder and Zalán Szakacs
+The controller software for the UMBRA a/v performance done by Zalán Szakacs, Nikos ten Hoedt and Mark Ridder. 
 
 USAGE:
 1. Install PlatformIO -> https://platformio.org/install/ide?install=vscode
