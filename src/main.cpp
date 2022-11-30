@@ -19,7 +19,7 @@
 
 
 // CONTROLLER NAME
-const char controller[] = "rail1";
+const char controller[] = "rail1";            // change this to the controller you want to program
 
 // NETWORK SETTINGS
 IPAddress sendIp(192, 168, 178, 213);         // the ip address of the receiving party
