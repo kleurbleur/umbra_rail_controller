@@ -1,3 +1,11 @@
+// CODE WRITTEN FOR UMBRA DURING INNOVATIONLAB UTRECHT BY MARK RIDDER, 2022
+//
+// HARDWARE USED 
+// CONTROLLER: OLIMEX EPS-POE-ISO
+// DRIVER: TB6600
+// STEPPER: JK57HS76-2804-76A - NEMA23
+// INDUCTIVE SENSORS: LJ18A3-8-Z/BX
+
 #include <Arduino.h>
 #include <PubSubClient.h>
 #include <ETH.h>
@@ -41,6 +49,7 @@ MicroOscUdp<1024> oscUdp(&udp, sendIp, sendPort);
 // GLOBAL VARIABLES 
 bool stepper_enable = false;
 bool stepper_calibrated = false;
+bool receive_OSC = false;
 u_int32_t relative_position = 0;
 
 
@@ -106,7 +115,6 @@ void receivedOscMessage( MicroOscMessage& message) {
       oscUdp.sendMessage( "/enable/i",  "i",  val);        // 3. send a validation back via OSC
     }
   }                                                        // end check for the enable command 
-
 
   if ( message.fullMatch("/enable/i", "i") ) {            // check for the full message match "/enable/i" so for the enable command
     int32_t val = message.nextAsInt();                    // make val a local var with the value received from the matched OSC message
@@ -226,6 +234,7 @@ bool sensorB()                                             // setup a true/false
 
 // THIS FUNCTION HAS TO BE TESTED - THE CALIBRATION FUNCTION
 bool stepperCalibration(){                                 // setup a true/false function to check if the stepper is calibrated or not
+  receive_OSC = false;                                     // make sure that incoming OSC messages don't ruin the calibration process
   Serial.println("calibrating steppper");
   stepper.setMaxSpeed(1000);                               // set the speed quite slow to not make any accidents
   stepper.setAcceleration(1000);                           // same for acceleration
@@ -236,6 +245,7 @@ bool stepperCalibration(){                                 // setup a true/false
     relative_position = stepper.currentPosition();         // set the relative position with the current value so we know the home position
     stepper_calibrated = true;                             // set the stepper calibrated flag so the sytem knows it's calibrated
     oscUdp.sendMessage( "/calibration/i",  "i",  stepper_calibrated);  // 2. send a validation back via OSC
+    receive_OSC = true;                                    // let's open up OSC
     return true;                                           // return true when this function is checked 
   }
   else if (!sensorA || !sensorB)                           // if neither of the sensors are active
@@ -262,8 +272,6 @@ void setup()
   {
     stepperCalibration();                                   // run the calibration function
   }
-
-
 }
 
 
@@ -274,7 +282,11 @@ void loop()
   sensorB();                                                 // continously check for sensor input
 
 
-  oscUdp.receiveMessages( receivedOscMessage );              // handle the incoming OSC messages
+  if (receive_OSC)
+  {
+    oscUdp.receiveMessages( receivedOscMessage );            // handle the incoming OSC messages
+  }
+
 
   if (stepper_enable && stepper_calibrated)                  // if the stepper enable flag is set AND the stepper is calibrated...
   {
