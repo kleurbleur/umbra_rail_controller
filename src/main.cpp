@@ -6,29 +6,37 @@
 #include <AccelStepper.h>
 
 
+// DEBUG SETTINGS 1 = OSC INPUT
+u_int8_t DEBUG = 1;
+
+// PIN ASSIGNMENT
 #define dirPin 4
 #define stepPin 5
-#define motorInterfaceType 1 // Motor interface type must be set to 1 when using a driver:
 u_int8_t ind_sensor_a = 32;
 u_int8_t ind_sensor_b = 33;
 
 
-
+// NETWORK SETTINGS
 unsigned int receivePort = 8888;
 unsigned int sendPort = 7777;
 IPAddress broadcastIp(255, 255, 255, 255);
 IPAddress sendIp(192, 168, 178, 213);
 
+
+// LIB SETUP
+#define motorInterfaceType 1 // Motor interface type must be set to 1 when using a driver:
 AccelStepper stepper = AccelStepper(motorInterfaceType, stepPin, dirPin);
 WiFiClient ethclient;
 WiFiUDP udp;
 MicroOscUdp<1024> oscUdp(&udp, sendIp, sendPort);
 
-// variables
+
+// GLOBAL VARIABLES 
 bool stepper_enable = false;
 u_int32_t relative_position = 10000;
 
-// the ethernet function
+
+// ETHERNET FUNCTION
 static bool eth_connected = false;
 void WiFiEvent(WiFiEvent_t event)
 {
@@ -70,27 +78,29 @@ void WiFiEvent(WiFiEvent_t event)
 }
 
 
-// FUNCTION THAT WILL BE CALLED WHEN AN OSC MESSAGE IS RECEIVED:
+// OSC CALLBACK
 void receivedOscMessage( MicroOscMessage& message) {
 
-  if ( message.fullMatch("/enable/i", "i") ) {
-    int32_t val = message.nextAsInt();
-
-    oscUdp.sendMessage( "/enable/i",  "i",  val);
-    Serial.print("DEBUG /enable/i ");
-    Serial.println(val);
-
-    // Set the target position:
-    if (val){
-      stepper_enable = true;
-      Serial.println("Outputs enabled");
-      // stepper.enableOutputs();
-    }
-    else if (!val)
+  if ( message.fullMatch("/enable/i", "i") ) {            // check for the full message match "/enable/i"
+    int32_t val = message.nextAsInt();                    // make val a local var with the value received from the matched OSC message
+    if (DEBUG == 1)
     {
-      stepper_enable = false;
-      Serial.println("Outputs disabled");
-      // stepper.disableOutputs();
+      Serial.print("DEBUG /enable/i ");
+      Serial.println(val);
+    }
+    if (val)                                              // if the received val is true (1)...
+    {                                            
+      stepper_enable = true;                              // 1. enable the stepper in the main loop via this flag
+      Serial.printf("stepper_enable: ", stepper_enable);  // 2. inform via Serial 
+      oscUdp.sendMessage( "/enable/i",  "i",  val);       // 3. send a validation back via OSC
+      // stepper.enableOutputs(); // this does not seem to work
+    }
+    else if (!val)                                         // if the received val is false (0)...
+    {
+      stepper_enable = false;                              // 1. enable the stepper in the main loop via this flag
+      Serial.printf("stepper_enable: ", stepper_enable);   // 2. inform via Serial
+      oscUdp.sendMessage( "/enable/i",  "i",  val);        // 3. send a validation back via OSC
+      // stepper.disableOutputs();  // this does not seem to work
     }
   }
 
@@ -115,74 +125,71 @@ void receivedOscMessage( MicroOscMessage& message) {
     Serial.println("Run to position");
     Serial.println(stepper.distanceToGo());
   }
-  if ( message.fullMatch("/test/i", "i") ) {
-    int32_t firstArgument = message.nextAsInt();
+  // // example code for later use
+  // if ( message.fullMatch("/test/i", "i") ) {
+  //   int32_t firstArgument = message.nextAsInt();
+  //   oscUdp.sendMessage( "/test/i",  "i",  firstArgument);
+  //   Serial.print("DEBUG /test/i ");
+  //   Serial.println(firstArgument);
+  // } else if ( message.fullMatch("/test/f",  "f")) {
+  //   float firstArgument = message.nextAsFloat();
+  //   oscUdp.sendMessage( "/test/f",  "f",  firstArgument);
+  //   Serial.print("DEBUG /test/f ");
+  //   Serial.println(firstArgument);
+  // } else if ( message.fullMatch("/test/b",  "b")) {
+  //   const uint8_t* blob;
+  //   uint32_t length = message.nextAsBlob(&blob);
+  //   if ( length != 0) {
+  //     oscUdp.sendMessage( "/test/b", "b", blob, length);
+  //     Serial.print("DEBUG /test/b ");
+  //     for ( int i = 0; i < length; i++ ) {
+  //       Serial.print(blob[i]);
+  //     }
+  //     Serial.println();
+  //   }
+  // } else if ( message.fullMatch("/test/s",  "s")) {
+  //   const char * s = message.nextAsString();
+  //   oscUdp.sendMessage( "/test/s",  "s",  s);
+  //   Serial.print("DEBUG /test/s ");
+  //   Serial.println(s);
+  // } else if ( message.fullMatch("/test/m", "m")) {
+  //   const uint8_t* midi;
+  //   message.nextAsMidi(&midi);
+  //   if ( midi != NULL ) {
+  //     oscUdp.sendMessage( "/test/m",  "m", midi);
+  //     Serial.print("DEBUG /test/m ");
+  //     for ( int i = 0; i < 4; i++ ) {
+  //       Serial.print(midi[i]);
+  //     }
+  //     Serial.println();
+  //   }
+  // }
 
-    oscUdp.sendMessage( "/test/i",  "i",  firstArgument);
-    Serial.print("DEBUG /test/i ");
-    Serial.println(firstArgument);
-
-  } else if ( message.fullMatch("/test/f",  "f")) {
-    float firstArgument = message.nextAsFloat();
-    oscUdp.sendMessage( "/test/f",  "f",  firstArgument);
-    Serial.print("DEBUG /test/f ");
-    Serial.println(firstArgument);
-
-  } else if ( message.fullMatch("/test/b",  "b")) {
-    const uint8_t* blob;
-    uint32_t length = message.nextAsBlob(&blob);
-    if ( length != 0) {
-      oscUdp.sendMessage( "/test/b", "b", blob, length);
-      Serial.print("DEBUG /test/b ");
-      for ( int i = 0; i < length; i++ ) {
-        Serial.print(blob[i]);
-      }
-      Serial.println();
-    }
-
-  } else if ( message.fullMatch("/test/s",  "s")) {
-    const char * s = message.nextAsString();
-    oscUdp.sendMessage( "/test/s",  "s",  s);
-    Serial.print("DEBUG /test/s ");
-    Serial.println(s);
-
-  } else if ( message.fullMatch("/test/m", "m")) {
-    const uint8_t* midi;
-    message.nextAsMidi(&midi);
-    if ( midi != NULL ) {
-      oscUdp.sendMessage( "/test/m",  "m", midi);
-      Serial.print("DEBUG /test/m ");
-      for ( int i = 0; i < 4; i++ ) {
-        Serial.print(midi[i]);
-      }
-      Serial.println();
-    }
-
-  }
 }
 
+// SENSOR FUNCTIONS
 bool sensorA()
 {
-  if (digitalRead(ind_sensor_a))
+  if (digitalRead(ind_sensor_a)) // if we have input from sensor a...
   {
-    stepper.stop();
-    return true;
+    stepper.stop(); // 1. then stop the stepper
+    return true;    // 2. let the system know that the stepper is there
   }
-  else if (!digitalRead(ind_sensor_a))
+  else if (!digitalRead(ind_sensor_a)) // if we don't have input from sensor a
   {
-    return false;
+    return false;   // 1. let the system know that the stepper is NOT there
   }
 }
 bool sensorB()
 {
-  if (digitalRead(ind_sensor_b))
+  if (digitalRead(ind_sensor_b)) // if we have input from sensor a...
   {
-    stepper.stop();
-    return true;
+    stepper.stop(); // 1. then stop the stepper
+    return true;    // 2. let the system know that the stepper is there
   }
-  else if (!digitalRead(ind_sensor_b))
+  else if (!digitalRead(ind_sensor_b))  // if we don't have input from sensor a
   {
-    return false;
+    return false;   // 1. let the system know that the stepper is NOT there
   }
 }
 
@@ -192,7 +199,7 @@ bool stepper_calibrated(){
   stepper.setAcceleration(1000);
   stepper.run();
 
-  if(sensorA || sensorB)
+  if (sensorA || sensorB)
   {
     relative_position = stepper.currentPosition(); // te testen
     return true;
