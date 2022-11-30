@@ -10,17 +10,24 @@
 u_int8_t DEBUG = 1;
 
 // PIN ASSIGNMENT
-#define dirPin 4
-#define stepPin 5
-u_int8_t ind_sensor_a = 32;
-u_int8_t ind_sensor_b = 33;
+#define dirPin 4                // Direction pin output for the Stepper Driver
+#define stepPin 5               // Step pin output for the Stepper Driver
+u_int8_t ind_sensor_a = 32;     // Input pin from sensor a - WARNING! -> only to be connected via an optocoupler!
+u_int8_t ind_sensor_b = 33;     // Input pin from sensor b - WARNING! -> only to be connected via an optocoupler!
 
 
 // NETWORK SETTINGS
-unsigned int receivePort = 8888;
-unsigned int sendPort = 7777;
-IPAddress broadcastIp(255, 255, 255, 255);
-IPAddress sendIp(192, 168, 178, 213);
+IPAddress sendIp(192, 168, 178, 213);         // the ip address of the receiving party
+unsigned int receivePort = 8888;              // the port in which the OSC messsage come in
+unsigned int sendPort = 7777;                 // and the port towards the OSC messages are send
+IPAddress broadcastIp(255, 255, 255, 255);    // did not test it yet, but looks like a broadcast option
+
+
+
+// ================================================================================================
+// AFTER THIS DON'T EDIT UNLESS YOU KNOW WHAT IS WHAT
+// ================================================================================================
+
 
 
 // LIB SETUP
@@ -33,7 +40,7 @@ MicroOscUdp<1024> oscUdp(&udp, sendIp, sendPort);
 
 // GLOBAL VARIABLES 
 bool stepper_enable = false;
-u_int32_t relative_position = 10000;
+u_int32_t relative_position = 0;
 
 
 // ETHERNET FUNCTION
@@ -81,7 +88,7 @@ void WiFiEvent(WiFiEvent_t event)
 // OSC CALLBACK
 void receivedOscMessage( MicroOscMessage& message) {
 
-  if ( message.fullMatch("/enable/i", "i") ) {            // check for the full message match "/enable/i"
+  if ( message.fullMatch("/enable/i", "i") ) {            // check for the full message match "/enable/i" so for the enable command
     int32_t val = message.nextAsInt();                    // make val a local var with the value received from the matched OSC message
     if (DEBUG == 1)
     {
@@ -102,28 +109,30 @@ void receivedOscMessage( MicroOscMessage& message) {
       oscUdp.sendMessage( "/enable/i",  "i",  val);        // 3. send a validation back via OSC
       // stepper.disableOutputs();  // this does not seem to work
     }
-  }
+  }                                                        // end check for the enable command 
 
-  if ( message.fullMatch("/speed/i", "i") ) {
-    int32_t val = message.nextAsInt();
-
-    oscUdp.sendMessage( "/speed/i",  "i",  val);
+  if ( message.fullMatch("/speed/i", "i") ) {              // check for the full message match "/speed/i" so for the speed command
+    int32_t val = message.nextAsInt();                     // make val a local var with the value received from the matched OSC message
+    if (DEBUG == 1)
+    {
     Serial.print("DEBUG /speed/i ");
     Serial.println(val);
-
-    stepper.setMaxSpeed(val);
+    }
+    stepper.setMaxSpeed(val);                              // set the stepper speed with the received val
+    oscUdp.sendMessage( "/speed/i",  "i",  val);           // send a validation back via OSC
   }  
 
-  if ( message.fullMatch("/position/i", "i") ) {
-    int32_t val = message.nextAsInt();
-
-    oscUdp.sendMessage( "/position/i",  "i",  val);
+  if ( message.fullMatch("/position/i", "i") ) {           // check for the full message match "/position/i" so for the position command
+    int32_t val = message.nextAsInt();                     // make val a local var with the value received from the matched OSC message
+    if (DEBUG == 1)
+    {
     Serial.print("DEBUG /position/i ");
     Serial.println(val);
-
-    stepper.moveTo(val);
-    Serial.println("Run to position");
+    }
+    stepper.moveTo(val+relative_position);                 // make sure to use the calibrated distance from the sensor with incoming position 
+    Serial.print("Target position: ");                     // inform via Serial
     Serial.println(stepper.distanceToGo());
+    oscUdp.sendMessage( "/position/i",  "i",  val);        // send a validation back via OSC (only val, because the calibrated distance will alter per setup)
   }
   // // example code for later use
   // if ( message.fullMatch("/test/i", "i") ) {
@@ -168,28 +177,28 @@ void receivedOscMessage( MicroOscMessage& message) {
 }
 
 // SENSOR FUNCTIONS
-bool sensorA()
+bool sensorA()                                             // setup a true/false function to check if the sensors have input or not
 {
-  if (digitalRead(ind_sensor_a)) // if we have input from sensor a...
+  if (digitalRead(ind_sensor_a))                           // if we have input from sensor a...
   {
-    stepper.stop(); // 1. then stop the stepper
-    return true;    // 2. let the system know that the stepper is there
+    stepper.stop();                                        // 1. then stop the stepper
+    return true;                                           // 2. let the system know that the stepper is there
   }
-  else if (!digitalRead(ind_sensor_a)) // if we don't have input from sensor a
+  else if (!digitalRead(ind_sensor_a))                     // if we don't have input from sensor a
   {
-    return false;   // 1. let the system know that the stepper is NOT there
+    return false;                                          // 1. let the system know that the stepper is NOT there
   }
 }
-bool sensorB()
+bool sensorB()                                             // setup a true/false function to check if the sensors have input or not
 {
-  if (digitalRead(ind_sensor_b)) // if we have input from sensor a...
+  if (digitalRead(ind_sensor_b))                           // if we have input from sensor a...
   {
-    stepper.stop(); // 1. then stop the stepper
-    return true;    // 2. let the system know that the stepper is there
+    stepper.stop();                                        // 1. then stop the stepper
+    return true;                                           // 2. let the system know that the stepper is there
   }
-  else if (!digitalRead(ind_sensor_b))  // if we don't have input from sensor a
+  else if (!digitalRead(ind_sensor_b))                     // if we don't have input from sensor a
   {
-    return false;   // 1. let the system know that the stepper is NOT there
+    return false;                                          // 1. let the system know that the stepper is NOT there
   }
 }
 
