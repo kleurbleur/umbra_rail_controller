@@ -32,7 +32,8 @@
 const char controller[] = "left";             // change this to the controller you want to program options are "left", "middle" and "right"
 
 // NETWORK SETTINGS
-IPAddress sendIp(2, 0, 0, 11);                // the ip address of the receiving party 
+IPAddress localIP(2, 0, 0, 11);               // set the fixed ip address
+IPAddress sendIp(2, 0, 0, 3);                 // the ip address of the receiving party 
 unsigned int receivePort = 8888;              // the port in which the OSC messsage come in
 unsigned int sendPort = 7777;                 // and the port towards the OSC messages are send
 IPAddress broadcastIp(255, 255, 255, 255);    // did not test it yet, but looks like a broadcast option
@@ -127,10 +128,10 @@ void WiFiEvent(WiFiEvent_t event)
 }
 
 
-// SENSOR FUNCTIONS
+// SENSOR FUNCTIONS ----  TEST
 bool sensorA()                                             // setup a true/false function to check if the sensors have input or not
 {
-  if (digitalRead(ind_sensor_a) && !sen_a_high)            // if we have input from sensor a...
+  if (!digitalRead(ind_sensor_a) && !sen_a_high)            // if we have input from sensor a...
   {
     sen_a_high = true;
     sen_a_low = false;
@@ -140,33 +141,33 @@ bool sensorA()                                             // setup a true/false
     oscUdp.sendMessage("/sensor_a/i", "i", 1);              // 3. send via OSC a message that the sensor is active
     return true;                                           // 4. let the system know that the stepper is there
   }
-  else if (!digitalRead(ind_sensor_a) && !sen_a_low)      // if we don't have input from sensor a
+  else if (digitalRead(ind_sensor_a) && !sen_a_low)      // if we don't have input from sensor a
   {
     sen_a_low = true;
     sen_a_high = false;
     Serial.println("SensorA not active");                  // 1. inform via Serial
-    oscUdp.sendMessage("/sensor_a/i", "i", 0);              // 2. send via OSC a message that the sensor is active
+    oscUdp.sendMessage("/sensor_a/i", "i", 0);             // 2. send via OSC a message that the sensor is active
     return false;                                          // 3. let the system know that the stepper is NOT there
   }
 }
 bool sensorB()                                             // setup a true/false function to check if the sensors have input or not
 {
-  if (digitalRead(ind_sensor_b) && !sen_b_high)            // if we have input from sensor a...
+  if (!digitalRead(ind_sensor_b) && !sen_b_high)           // if we have input from sensor a...
   {
     sen_b_high = true;
     sen_b_low = false;
     stepper_enable = false;                                // 0. flag the stepper to stop
     stepper.stop();                                        // 1. then stop the stepper
     Serial.println("SensorB active");                      // 2. inform via Serial
-    oscUdp.sendMessage("/sensor_b/i", "i", 1);              // 3. send via OSC a message that the sensor is active
+    oscUdp.sendMessage("/sensor_b/i", "i", 1);             // 3. send via OSC a message that the sensor is active
     return true;                                           // 4. let the system know that the stepper is there
   }
-  else if (!digitalRead(ind_sensor_b) && !sen_b_low)      // if we don't have input from sensor a
+  else if (digitalRead(ind_sensor_b) && !sen_b_low)        // if we don't have input from sensor a
   {
     sen_b_low = true;
     sen_b_high = false;
     Serial.println("SensorB not active");                  // 1. inform via Serial
-    oscUdp.sendMessage("/sensor_b/i", "i", 0);              // 2. send via OSC a message that the sensor is active
+    oscUdp.sendMessage("/sensor_b/i", "i", 0);             // 2. send via OSC a message that the sensor is active
     return false;                                          // 3. let the system know that the stepper is NOT there
   }
 }
@@ -312,45 +313,6 @@ void receivedOscMessage( MicroOscMessage& message)
     Serial.println(stepper.distanceToGo());
     oscUdp.sendMessage(position, "i", val);                // send a validation back via OSC (only val, because the calibrated distance will alter per setup)
   }
-  // // example code for later use
-  // if ( message.fullMatch("/test/i", "i") ) {
-  //   int32_t firstArgument = message.nextAsInt();
-  //   oscUdp.sendMessage( "/test/i",  "i",  firstArgument);
-  //   Serial.print("DEBUG /test/i ");
-  //   Serial.println(firstArgument);
-  // } else if ( message.fullMatch("/test/f",  "f")) {
-  //   float firstArgument = message.nextAsFloat();
-  //   oscUdp.sendMessage( "/test/f",  "f",  firstArgument);
-  //   Serial.print("DEBUG /test/f ");
-  //   Serial.println(firstArgument);
-  // } else if ( message.fullMatch("/test/b",  "b")) {
-  //   const uint8_t* blob;
-  //   uint32_t length = message.nextAsBlob(&blob);
-  //   if ( length != 0) {
-  //     oscUdp.sendMessage( "/test/b", "b", blob, length);
-  //     Serial.print("DEBUG /test/b ");
-  //     for ( int i = 0; i < length; i++ ) {
-  //       Serial.print(blob[i]);
-  //     }
-  //     Serial.println();
-  //   }
-  // } else if ( message.fullMatch("/test/s",  "s")) {
-  //   const char * s = message.nextAsString();
-  //   oscUdp.sendMessage( "/test/s",  "s",  s);
-  //   Serial.print("DEBUG /test/s ");
-  //   Serial.println(s);
-  // } else if ( message.fullMatch("/test/m", "m")) {
-  //   const uint8_t* midi;
-  //   message.nextAsMidi(&midi);
-  //   if ( midi != NULL ) {
-  //     oscUdp.sendMessage( "/test/m",  "m", midi);
-  //     Serial.print("DEBUG /test/m ");
-  //     for ( int i = 0; i < 4; i++ ) {
-  //       Serial.print(midi[i]);
-  //     }
-  //     Serial.println();
-  //   }
-  // }
 
 }
 
@@ -370,8 +332,9 @@ void setup()
  
   WiFi.onEvent(WiFiEvent);
   ETH.begin();
-
+  ETH.config(localIP, IPAddress(192, 168, 9, 1), IPAddress(255, 255, 255, 0), IPAddress(192, 168, 9, 1));
   udp.begin(receivePort);
+
 
   stepper.setMaxSpeed(0);                                   // make sure that the stepper doesn't go anywhere when only enabling
   stepper.setAcceleration(0);                               // make sure that the stepper doesn't go anywhere when only enabling
