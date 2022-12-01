@@ -74,6 +74,10 @@ char speed[64] = "";
 char acceleration[64] = "";
 char position[64] = "";
 u_int32_t relative_position = 0;
+bool sen_a_high = false;
+bool sen_a_low = false;
+bool sen_b_high = false;
+bool sen_b_low = false;
 
 
 // ETHERNET FUNCTION
@@ -121,28 +125,44 @@ void WiFiEvent(WiFiEvent_t event)
 // SENSOR FUNCTIONS
 bool sensorA()                                             // setup a true/false function to check if the sensors have input or not
 {
-  if (digitalRead(ind_sensor_a))                           // if we have input from sensor a...
+  if (digitalRead(ind_sensor_a) && !sen_a_high)            // if we have input from sensor a...
   {
+    sen_a_high = true;
+    sen_a_low = false;
     stepper_enable = false;                                // 0. flag the stepper to stop
     stepper.stop();                                        // 1. then stop the stepper
-    return true;                                           // 2. let the system know that the stepper is there
+    Serial.println("SensorA active");                      // 2. inform via Serial
+    oscUdp.sendMessage("/sensorA/i", "i", 1);              // 3. send via OSC a message that the sensor is active
+    return true;                                           // 4. let the system know that the stepper is there
   }
-  else if (!digitalRead(ind_sensor_a))                     // if we don't have input from sensor a
+  else if (!digitalRead(ind_sensor_a) && !sen_a_low)      // if we don't have input from sensor a
   {
-    return false;                                          // 1. let the system know that the stepper is NOT there
+    sen_a_low = true;
+    sen_a_high = false;
+    Serial.println("SensorA not active");                  // 1. inform via Serial
+    oscUdp.sendMessage("/sensorA/i", "i", 0);              // 2. send via OSC a message that the sensor is active
+    return false;                                          // 3. let the system know that the stepper is NOT there
   }
 }
 bool sensorB()                                             // setup a true/false function to check if the sensors have input or not
 {
-  if (digitalRead(ind_sensor_b))                           // if we have input from sensor a...
+  if (digitalRead(ind_sensor_b) && !sen_b_high)            // if we have input from sensor a...
   {
+    sen_b_high = true;
+    sen_b_low = false;
     stepper_enable = false;                                // 0. flag the stepper to stop
     stepper.stop();                                        // 1. then stop the stepper
-    return true;                                           // 2. let the system know that the stepper is there
+    Serial.println("SensorB active");                      // 2. inform via Serial
+    oscUdp.sendMessage("/sensorB/i", "i", 1);              // 3. send via OSC a message that the sensor is active
+    return true;                                           // 4. let the system know that the stepper is there
   }
-  else if (!digitalRead(ind_sensor_b))                     // if we don't have input from sensor a
+  else if (!digitalRead(ind_sensor_b) && !sen_b_low)      // if we don't have input from sensor a
   {
-    return false;                                          // 1. let the system know that the stepper is NOT there
+    sen_b_low = true;
+    sen_b_high = false;
+    Serial.println("SensorB not active");                  // 1. inform via Serial
+    oscUdp.sendMessage("/sensorB/i", "i", 0);              // 2. send via OSC a message that the sensor is active
+    return false;                                          // 3. let the system know that the stepper is NOT there
   }
 }
 
