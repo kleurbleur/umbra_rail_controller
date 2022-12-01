@@ -307,11 +307,16 @@ void receivedOscMessage( MicroOscMessage& message)
 
 void setup()
 {
+  Serial.begin(115200);
 
-  // setup the osc naming
+  // make sure that the inputs are set
+  pinMode(32, INPUT_PULLUP);
+  pinMode(33, INPUT_PULLUP);
+
+   // setup the osc naming
   oscMessage();
 
-  Serial.begin(115200);
+ 
   WiFi.onEvent(WiFiEvent);
   ETH.begin();
 
