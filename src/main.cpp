@@ -23,6 +23,8 @@
 
 // SENDING THE FOLLOWING OSC MESSAGES
 // controllername/distance/i [int 0 - 200000]
+// controllername/sensor_a/i [int 0 - 1]
+// controllername/sensor_b/i [int 0 - 1]
 
 
 
@@ -135,7 +137,7 @@ bool sensorA()                                             // setup a true/false
     stepper_enable = false;                                // 0. flag the stepper to stop
     stepper.stop();                                        // 1. then stop the stepper
     Serial.println("SensorA active");                      // 2. inform via Serial
-    oscUdp.sendMessage("/sensorA/i", "i", 1);              // 3. send via OSC a message that the sensor is active
+    oscUdp.sendMessage("/sensor_a/i", "i", 1);              // 3. send via OSC a message that the sensor is active
     return true;                                           // 4. let the system know that the stepper is there
   }
   else if (!digitalRead(ind_sensor_a) && !sen_a_low)      // if we don't have input from sensor a
@@ -143,7 +145,7 @@ bool sensorA()                                             // setup a true/false
     sen_a_low = true;
     sen_a_high = false;
     Serial.println("SensorA not active");                  // 1. inform via Serial
-    oscUdp.sendMessage("/sensorA/i", "i", 0);              // 2. send via OSC a message that the sensor is active
+    oscUdp.sendMessage("/sensor_a/i", "i", 0);              // 2. send via OSC a message that the sensor is active
     return false;                                          // 3. let the system know that the stepper is NOT there
   }
 }
@@ -156,7 +158,7 @@ bool sensorB()                                             // setup a true/false
     stepper_enable = false;                                // 0. flag the stepper to stop
     stepper.stop();                                        // 1. then stop the stepper
     Serial.println("SensorB active");                      // 2. inform via Serial
-    oscUdp.sendMessage("/sensorB/i", "i", 1);              // 3. send via OSC a message that the sensor is active
+    oscUdp.sendMessage("/sensor_b/i", "i", 1);              // 3. send via OSC a message that the sensor is active
     return true;                                           // 4. let the system know that the stepper is there
   }
   else if (!digitalRead(ind_sensor_b) && !sen_b_low)      // if we don't have input from sensor a
@@ -164,7 +166,7 @@ bool sensorB()                                             // setup a true/false
     sen_b_low = true;
     sen_b_high = false;
     Serial.println("SensorB not active");                  // 1. inform via Serial
-    oscUdp.sendMessage("/sensorB/i", "i", 0);              // 2. send via OSC a message that the sensor is active
+    oscUdp.sendMessage("/sensor_b/i", "i", 0);              // 2. send via OSC a message that the sensor is active
     return false;                                          // 3. let the system know that the stepper is NOT there
   }
 }
