@@ -73,11 +73,14 @@ char enable[64] = "";
 char speed[64] = "";
 char acceleration[64] = "";
 char position[64] = "";
-u_int32_t relative_position = 0;
+u_int32_t sensor_a_position = 0;
+u_int32_t sensor_b_position = 0;
 bool sen_a_high = false;
 bool sen_a_low = false;
 bool sen_b_high = false;
 bool sen_b_low = false;
+bool sensor_a_calibrated = false;
+bool sensor_b_calibrated = false;
 
 
 // ETHERNET FUNCTION
@@ -172,20 +175,38 @@ bool stepperCalibration(){                                 // setup a true/false
   Serial.println("calibrating steppper");
   stepper.setMaxSpeed(1000);                               // set the speed quite slow to not make any accidents
   stepper.setAcceleration(1000);                           // same for acceleration
+  stepper.moveTo(100000);                                  // move it to an extreme position
   stepper_enable = true;                                   // set the flag so the stepper.run() code is executed continously in the main loop
 
-  if (sensorA || sensorB)                                  // if either sensor is active...
+  if (sensorA)                                             // if sensor A is active...
   {
-    relative_position = stepper.currentPosition();         // set the relative position with the current value so we know the home position
-    stepper_calibrated = true;                             // set the stepper calibrated flag so the sytem knows it's calibrated
-    oscUdp.sendMessage( "/calibration/i",  "i",  stepper_calibrated);  // 2. send a validation back via OSC
-    receive_OSC = true;                                    // let's open up OSC
-    return true;                                           // return true when this function is checked 
+    sensor_a_position = stepper.currentPosition();         // 1. set the relative position with the current value so we know the home position
+    sensor_a_calibrated = true;                            // 2. set the sensor a calibrated flag so the sytem knows it's calibrated
+    stepper.moveTo(-100000);                               // 3. move it to the other extreme position
   }
+  if (sensorB)                                             // if sensor B is active...
+  {
+    sensor_b_position = stepper.currentPosition();         // 1. set the relative position with the current value so we know the home position
+    sensor_b_calibrated = true;                            // 2. set the sensor a calibrated flag so the sytem knows it's calibrated
+    stepper.moveTo(-100000);                               // 3. move it to the other extreme position
+  }
+
   else if (!sensorA || !sensorB)                           // if neither of the sensors are active
   {
     return false;
   }
+
+  if (sensor_a_calibrated && sensor_b_calibrated)          // if both sensors are calibrated...
+  {
+    stepper_enable = false;                                // 1. stop the stepper
+    stepper.setMaxSpeed(0);                                // 2. set the speed to 0 again
+    stepper.setAcceleration(0);                            // 3. same for acceleration
+    stepper_calibrated = true;                             // 4. set the calibrated flag
+    oscUdp.sendMessage( "/calibration/i",  "i",  stepper_calibrated);  // 5. send a validation back via OSC
+    receive_OSC = true;                                    // 6. let's open up OSC again
+    return true;                                           // 7. return true when this function is checked 
+  }
+
 
 }
 
@@ -240,7 +261,7 @@ void receivedOscMessage( MicroOscMessage& message)
       Serial.println(val);
     }
     if (val)                                              // if the received val is true (1)...
-    {                                            
+    {                                           
       stepper_enable = true;                              // 1. enable the stepper in the main loop via this flag
       Serial.printf("stepper_enable: ", stepper_enable);  // 2. inform via Serial 
       oscUdp.sendMessage(enable,  "i",  val);             // 3. send a validation back via OSC
@@ -284,7 +305,7 @@ void receivedOscMessage( MicroOscMessage& message)
     Serial.print("DEBUG /position/i ");
     Serial.println(val);
     }
-    stepper.moveTo(val+relative_position);                 // make sure to use the calibrated distance from the sensor with incoming position 
+    stepper.moveTo(val+sensor_a_position);                 // make sure to use the calibrated distance from the sensor with incoming position 
     Serial.print("Target position: ");                     // inform via Serial
     Serial.println(stepper.distanceToGo());
     oscUdp.sendMessage(position, "i", val);                // send a validation back via OSC (only val, because the calibrated distance will alter per setup)
