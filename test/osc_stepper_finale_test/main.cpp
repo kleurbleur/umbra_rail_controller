@@ -15,6 +15,14 @@
 // INDUCTIVE SENSORS: LJ18A3-8-Z/BX
 
 
+// LISTENING TO FOLLOWING OSC MESSAGES
+// controllername/calibration/i [int 0 - 1]
+// controllername/speed/i [int 0 15000]
+// controllername/acceleration/i [int 0 2000]
+// controllername/position/i [int 0 150000]
+
+// SENDING THE FOLLOWING OSC MESSAGES
+// controllername/calibration/i [int 0 - 1]
 
 
 
@@ -245,11 +253,11 @@ void receivedOscMessage( MicroOscMessage& message)
     Serial.print("DEBUG /acceleration/i ");
     Serial.println(val);
     }
-    stepper.setAcceleration(val);                           // set the stepper speed with the received val
-    oscUdp.sendMessage(acceleration, "i", val);             // send a validation back via OSC
+    stepper.setAcceleration(val);                          // set the stepper speed with the received val
+    oscUdp.sendMessage(acceleration, "i", val);            // send a validation back via OSC
   }  
 
-  if ( message.fullMatch(position, "i") ) {                 // check for the full message match "/position/i" so for the position command
+  if ( message.fullMatch(position, "i") ) {                // check for the full message match "/position/i" so for the position command
     int32_t val = message.nextAsInt();                     // make val a local var with the value received from the matched OSC message
     if (DEBUG == 1)
     {
@@ -357,9 +365,10 @@ void loop()
   }
 
 
-  if (DEBUG == 2)
+  if (stepper.isRunning())
   {
-    if (stepper.isRunning())
+    oscUdp.sendMessage("/distance/i", "i", stepper.distanceToGo());
+    if (DEBUG == 2)
     {
       Serial.println(stepper.distanceToGo());
     }
