@@ -27,10 +27,10 @@
 
 
 // CONTROLLER NAME
-const char controller[] = "rail1";            // change this to the controller you want to program
+const char controller[] = "left";             // change this to the controller you want to program options are "left", "middle" and "right"
 
 // NETWORK SETTINGS
-IPAddress sendIp(192, 168, 178, 213);         // the ip address of the receiving party
+IPAddress sendIp(2, 0, 0, 11);                // the ip address of the receiving party 
 unsigned int receivePort = 8888;              // the port in which the OSC messsage come in
 unsigned int sendPort = 7777;                 // and the port towards the OSC messages are send
 IPAddress broadcastIp(255, 255, 255, 255);    // did not test it yet, but looks like a broadcast option
