@@ -22,7 +22,7 @@
 // controllername/position/i [int 0 150000]
 
 // SENDING THE FOLLOWING OSC MESSAGES
-// controllername/calibration/i [int 0 - 1]
+// controllername/distance/i [int 0 - 200000]
 
 
 
